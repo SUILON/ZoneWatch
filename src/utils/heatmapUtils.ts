@@ -242,10 +242,9 @@ export const getColorByValue = (
   value: number,
   minValue: number,
   maxValue: number,
-  colorScheme: SupportedScheme = "red"
+  colorScheme: SupportedScheme = "red",
+  steps: number = 5
 ): string => {
-  // 既定は5段階とする（従来互換）
-  const steps = 5;
   const palette = getSequentialPalette(colorScheme, steps);
   const index = quantizeValueToStep(value, minValue, maxValue, steps);
   return palette[index];
@@ -256,69 +255,70 @@ export const getColorForAreaByMapping = (
   areaName: string,
   colorMappingType: ColorMappingType,
   selectedDate: Date,
-  selectedDepartment?: string
+  selectedDepartment?: string,
+  colorSteps: number = 5
 ): string => {
   if (colorMappingType === "fireDepartment") {
     return getColorForArea(areaName, selectedDepartment);
   } else if (colorMappingType === "emergencyCalls") {
     const year = selectedDate.getFullYear();
 
-    // まず完全一致を試す
-    let yearData = emergencyCallsTimeSeriesData[areaName] || {};
-    let calls = yearData[year] || emergencyCallsData[areaName] || 0;
+    // エリアの当年値を取得（まず完全一致）
+    let series = emergencyCallsTimeSeriesData[areaName] || {};
+    let calls = series[year] || emergencyCallsData[areaName] || 0;
 
     // 完全一致しない場合、正規化された町名を試す
     if (calls === 0) {
-      const normalizedAreaName = areaName.replace(
-        /[一二三四五六七八九十]丁目$/,
-        ""
-      );
-      yearData = emergencyCallsTimeSeriesData[normalizedAreaName] || {};
-      calls = yearData[year] || emergencyCallsData[normalizedAreaName] || 0;
+      const normalizedAreaName = areaName.replace(/[一二三四五六七八九十]丁目$/, "");
+      series = emergencyCallsTimeSeriesData[normalizedAreaName] || {};
+      calls = series[year] || emergencyCallsData[normalizedAreaName] || 0;
     }
 
-    // その年の全データから最大・最小を取得
-    const allYearData = Object.values(yearData);
+    // その年の全エリアの値から最大・最小を取得（凡例と整合）
+    const values: number[] = [];
+    Object.values(emergencyCallsTimeSeriesData).forEach((areaData) => {
+      const v = areaData[year];
+      if (typeof v === "number") values.push(v);
+    });
     const maxCalls =
-      allYearData.length > 0
-        ? Math.max(...allYearData)
+      values.length > 0
+        ? Math.max(...values)
         : Math.max(...Object.values(emergencyCallsData));
     const minCalls =
-      allYearData.length > 0
-        ? Math.min(...allYearData)
+      values.length > 0
+        ? Math.min(...values)
         : Math.min(...Object.values(emergencyCallsData));
 
-    return getColorByValue(calls, minCalls, maxCalls, "red");
+    return getColorByValue(calls, minCalls, maxCalls, "red", colorSteps);
   } else if (colorMappingType === "populationDensity") {
     const year = selectedDate.getFullYear();
 
-    // まず完全一致を試す
-    let yearData = populationDensityTimeSeriesData[areaName] || {};
-    let density = yearData[year] || populationDensityData[areaName] || 0;
+    // エリアの当年値を取得
+    let series = populationDensityTimeSeriesData[areaName] || {};
+    let density = series[year] || populationDensityData[areaName] || 0;
 
-    // 完全一致しない場合、正規化された町名を試す
     if (density === 0) {
-      const normalizedAreaName = areaName.replace(
-        /[一二三四五六七八九十]丁目$/,
-        ""
-      );
-      yearData = populationDensityTimeSeriesData[normalizedAreaName] || {};
-      density =
-        yearData[year] || populationDensityData[normalizedAreaName] || 0;
+      const normalizedAreaName = areaName.replace(/[一二三四五六七八九十]丁目$/, "");
+      series = populationDensityTimeSeriesData[normalizedAreaName] || {};
+      density = series[year] || populationDensityData[normalizedAreaName] || 0;
     }
 
-    // その年の全データから最大・最小を取得
-    const allYearData = Object.values(yearData);
+    // その年の全エリアの値から最大・最小を取得
+    const values: number[] = [];
+    Object.values(populationDensityTimeSeriesData).forEach((areaData) => {
+      const v = areaData[year];
+      if (typeof v === "number") values.push(v);
+    });
     const maxDensity =
-      allYearData.length > 0
-        ? Math.max(...allYearData)
+      values.length > 0
+        ? Math.max(...values)
         : Math.max(...Object.values(populationDensityData));
     const minDensity =
-      allYearData.length > 0
-        ? Math.min(...allYearData)
+      values.length > 0
+        ? Math.min(...values)
         : Math.min(...Object.values(populationDensityData));
 
-    return getColorByValue(density, minDensity, maxDensity, "red");
+    return getColorByValue(density, minDensity, maxDensity, "red", colorSteps);
   }
 
   return "#CCCCCC"; // デフォルト色

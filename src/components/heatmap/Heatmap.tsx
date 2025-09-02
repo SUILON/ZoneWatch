@@ -10,14 +10,7 @@ import {
   Paper,
   IconButton,
 } from "@mui/material";
-import {
-  MapContainer,
-  TileLayer,
-  GeoJSON,
-  Marker,
-  Popup,
-  useMap,
-} from "react-leaflet";
+import { MapContainer, GeoJSON, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import ScrollableContainer from "@/components/common/ScrollableContainer";
 import {
@@ -75,6 +68,8 @@ const Heatmap: React.FC<HeatmapProps> = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedColorMapping, setSelectedColorMapping] =
     useState<ColorMappingType>("emergencyCalls");
+  // カラーステップ数（凡例/塗りつぶしで共通利用）
+  const colorSteps = 5;
 
   // 日付の範囲設定
   const minDate = new Date(2002, 0, 1);
@@ -153,7 +148,8 @@ const Heatmap: React.FC<HeatmapProps> = () => {
       areaName,
       selectedColorMapping,
       selectedDate,
-      selectedDepartment
+      selectedDepartment,
+      colorSteps
     );
     const department = getDepartmentForArea(areaName);
 
@@ -345,6 +341,7 @@ const Heatmap: React.FC<HeatmapProps> = () => {
             badgeData={badgeData}
             selectedColorMapping={selectedColorMapping}
             selectedDate={selectedDate}
+            colorSteps={colorSteps}
           />
 
           <MapContainer
