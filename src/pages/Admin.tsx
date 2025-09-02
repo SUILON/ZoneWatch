@@ -1,7 +1,9 @@
+import PageLayout from "@/components/layout/PageLayout";
+
 export default function Admin() {
   return (
-    <div>
-      <h1 className="text-3xl font-bold underline">Hello world!</h1>
-    </div>
+    <PageLayout>
+      <div>Admin Page</div>
+    </PageLayout>
   );
 }

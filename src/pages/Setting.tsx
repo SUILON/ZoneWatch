@@ -1,7 +1,9 @@
+import PageLayout from "@/components/layout/PageLayout";
+
 export default function Setting() {
   return (
-    <div>
-      <h1 className="text-3xl font-bold underline">Hello world!</h1>
-    </div>
+    <PageLayout>
+      <div>Setting Page</div>
+    </PageLayout>
   );
 }

@@ -1,7 +1,10 @@
+import Heatmap from "@/components/heatmap/Heatmap";
+import PageLayout from "@/components/layout/PageLayout";
+
 export default function Home() {
   return (
-    <div>
-      <h1 className="text-3xl font-bold underline">Hello world!</h1>
-    </div>
+    <PageLayout>
+      <Heatmap></Heatmap>
+    </PageLayout>
   );
 }
