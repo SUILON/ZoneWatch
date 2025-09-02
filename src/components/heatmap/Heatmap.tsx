@@ -249,12 +249,10 @@ const Heatmap: React.FC<HeatmapProps> = () => {
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    document.head.appendChild(link);
 
     const loadGeoJsonData = async () => {
       try {
@@ -356,10 +354,6 @@ const Heatmap: React.FC<HeatmapProps> = () => {
             style={{ height: "100%", width: "100%" }}
           >
             <MapController center={mapCenter} zoom={mapZoom} />
-            <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-              attribution='&copy; <a href="https://www.openstreetMap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            />
             {geoJsonData && (
               <GeoJSON
                 key={`${selectedDepartment}-${selectedColorMapping}-${selectedDate.getTime()}`}

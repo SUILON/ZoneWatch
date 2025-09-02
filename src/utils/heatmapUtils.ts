@@ -34,6 +34,115 @@ export const formatDate = (date: Date): string => {
   });
 };
 
+// ------------------------------
+// Color scale utilities (centralized)
+// ------------------------------
+
+// アンカー色（青→緑→黄→オレンジ→赤）
+const RED_SCHEME_ANCHORS = [
+  [0, 123, 255],
+  [40, 167, 69],
+  [255, 193, 7],
+  [255, 108, 0],
+  [220, 53, 69],
+];
+
+type SupportedScheme = "red" | "blue" | "green";
+
+// anchor配列からsteps数の連続カラーパレットを生成
+export const interpolateAnchors = (
+  anchors: number[][],
+  steps: number
+): string[] => {
+  if (steps <= 1) {
+    const [r, g, b] = anchors[anchors.length - 1];
+    return [`rgb(${r}, ${g}, ${b})`];
+  }
+  const out: string[] = [];
+  for (let i = 0; i < steps; i++) {
+    const t = steps === 1 ? 1 : i / (steps - 1); // 0..1
+    const pos = t * (anchors.length - 1);
+    const low = Math.floor(pos);
+    const high = Math.min(anchors.length - 1, low + 1);
+    const localT = pos - low;
+    const [r1, g1, b1] = anchors[low];
+    const [r2, g2, b2] = anchors[high];
+    const r = Math.round(r1 + (r2 - r1) * localT);
+    const g = Math.round(g1 + (g2 - g1) * localT);
+    const b = Math.round(b1 + (b2 - b1) * localT);
+    out.push(`rgb(${r}, ${g}, ${b})`);
+  }
+  return out;
+};
+
+// スキーム名と段階数からパレットを生成
+export const getSequentialPalette = (
+  scheme: SupportedScheme = "red",
+  steps: number = 5
+): string[] => {
+  if (scheme === "red") {
+    return interpolateAnchors(RED_SCHEME_ANCHORS, steps);
+  }
+  if (scheme === "blue") {
+    // 薄い水色→濃い青
+    return interpolateAnchors(
+      [
+        [204, 229, 255],
+        [102, 178, 255],
+        [51, 153, 255],
+        [0, 102, 204],
+        [0, 51, 153],
+      ],
+      steps
+    );
+  }
+  // 緑系（薄→濃）
+  return interpolateAnchors(
+    [
+      [229, 245, 224],
+      [161, 217, 155],
+      [116, 196, 118],
+      [49, 163, 84],
+      [0, 109, 44],
+    ],
+    steps
+  );
+};
+
+// 値を段階index(0..steps-1)に量子化
+export const quantizeValueToStep = (
+  value: number,
+  minValue: number,
+  maxValue: number,
+  steps: number
+): number => {
+  if (!isFinite(minValue) || !isFinite(maxValue) || steps <= 1) return 0;
+  const range = maxValue - minValue;
+  if (range <= 0) return steps - 1;
+  const normalized = (value - minValue) / range; // 0..1
+  const idx = Math.floor(normalized * steps);
+  return Math.min(Math.max(idx, 0), steps - 1);
+};
+
+// 凡例用の離散区分を生成
+export const getDiscreteStops = (
+  minValue: number,
+  maxValue: number,
+  steps: number = 5,
+  scheme: SupportedScheme = "red"
+) => {
+  const palette = getSequentialPalette(scheme, steps);
+  const stops = [] as { color: string; from: number; to: number | null }[];
+  const range = Math.max(0, maxValue - minValue);
+  for (let i = 0; i < steps; i++) {
+    const from = minValue + (range * i) / steps;
+    // 最後の区分は上限なし
+    const to = i === steps - 1 ? null : minValue + (range * (i + 1)) / steps;
+    stops.push({ color: palette[i], from, to });
+  }
+  return stops;
+};
+
 // 町名から管轄消防署を特定する関数
 export const getDepartmentForArea = (areaName: string): string => {
   // まず完全一致を試す
@@ -133,37 +242,13 @@ export const getColorByValue = (
   value: number,
   minValue: number,
   maxValue: number,
-  colorScheme: string = "red"
+  colorScheme: SupportedScheme = "red"
 ): string => {
-  const normalizedValue = (value - minValue) / (maxValue - minValue);
-
-  if (colorScheme === "red") {
-    // 一般的なヒートマップの5段階色分け（青→緑→黄→オレンジ→赤）
-    if (normalizedValue <= 0.2) {
-      // 青系（最低値）
-      return "rgb(0, 123, 255)";
-    } else if (normalizedValue <= 0.4) {
-      // 緑系（低値）
-      return "rgb(40, 167, 69)";
-    } else if (normalizedValue <= 0.6) {
-      // 黄系（中値）
-      return "rgb(255, 193, 7)";
-    } else if (normalizedValue <= 0.8) {
-      // オレンジ系（高値）
-      return "rgb(255, 108, 0)";
-    } else {
-      // 赤系（最高値）
-      return "rgb(220, 53, 69)";
-    }
-  } else if (colorScheme === "blue") {
-    // 青系のグラデーション（より濃い色）
-    const intensity = Math.floor(200 - normalizedValue * 150); // より濃い青色
-    return `rgb(${Math.max(50, intensity)}, ${Math.max(50, intensity)}, 255)`;
-  } else {
-    // 緑系のグラデーション
-    const intensity = Math.floor(255 - normalizedValue * 100);
-    return `rgb(${intensity}, 255, ${intensity})`;
-  }
+  // 既定は5段階とする（従来互換）
+  const steps = 5;
+  const palette = getSequentialPalette(colorScheme, steps);
+  const index = quantizeValueToStep(value, minValue, maxValue, steps);
+  return palette[index];
 };
 
 // カラーマッピングの種類に応じた色を取得する関数

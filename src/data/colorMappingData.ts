@@ -4,7 +4,7 @@ export const colorMappingOptions: ColorMappingOption[] = [
   {
     key: "emergencyCalls",
     label: "救急出場件数",
-    description: "救急出場件数に基づく色分け（件数が多いほど濃い色）",
+    description: "救急出場件数に基づく色分け",
   },
   {
     key: "fireDepartment",
@@ -14,7 +14,7 @@ export const colorMappingOptions: ColorMappingOption[] = [
   {
     key: "populationDensity",
     label: "人口密度",
-    description: "人口密度に基づく色分け（密度が高いほど濃い色）",
+    description: "人口密度に基づく色分け",
   },
 ];
 

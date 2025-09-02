@@ -7,11 +7,10 @@ import type {
   ColorMappingType,
 } from "@/types/HeatmapTypes";
 import {
-  emergencyCallsData,
-  populationDensityData,
   emergencyCallsTimeSeriesData,
   populationDensityTimeSeriesData,
 } from "@/data/colorMappingData";
+import { getDiscreteStops } from "@/utils/heatmapUtils";
 
 interface LegendComponentProps {
   asahiFireDepartmentData: FireDepartmentData;
@@ -20,6 +19,7 @@ interface LegendComponentProps {
   badgeData: BadgeData[];
   selectedColorMapping?: ColorMappingType;
   selectedDate?: Date;
+  colorSteps?: number; // ヒートマップ段階数（可変）
 }
 
 export const LegendComponent: React.FC<LegendComponentProps> = ({
@@ -29,6 +29,7 @@ export const LegendComponent: React.FC<LegendComponentProps> = ({
   badgeData,
   selectedColorMapping = "fireDepartment",
   selectedDate = new Date(),
+  colorSteps = 5,
 }) => {
   const getLegendContent = () => {
     if (selectedColorMapping === "fireDepartment") {
@@ -70,235 +71,75 @@ export const LegendComponent: React.FC<LegendComponentProps> = ({
           </Box>
         </Box>
       );
-    } else if (selectedColorMapping === "emergencyCalls") {
+    } else if (
+      selectedColorMapping === "emergencyCalls" ||
+      selectedColorMapping === "populationDensity"
+    ) {
       const year = selectedDate.getFullYear();
-      const yearData = emergencyCallsTimeSeriesData;
 
-      // その年の全データから最大・最小を取得
-      const allYearValues: number[] = [];
-      Object.values(yearData).forEach((areaData) => {
-        if (areaData[year] !== undefined) {
-          allYearValues.push(areaData[year]);
-        }
+      // 選択年の全エリアの値を収集
+      const dataset =
+        selectedColorMapping === "emergencyCalls"
+          ? emergencyCallsTimeSeriesData
+          : populationDensityTimeSeriesData;
+      const values: number[] = [];
+      Object.values(dataset).forEach((areaData) => {
+        const v = areaData[year];
+        if (typeof v === "number") values.push(v);
       });
 
-      const maxCalls =
-        allYearValues.length > 0
-          ? Math.max(...allYearValues)
-          : Math.max(...Object.values(emergencyCallsData));
-      const minCalls =
-        allYearValues.length > 0
-          ? Math.min(...allYearValues)
-          : Math.min(...Object.values(emergencyCallsData));
-      const midCalls = Math.round((maxCalls + minCalls) / 2);
+      if (values.length === 0) return null;
+
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+
+      // 中央集約したカラー管理を使用して段階を生成
+      const stops = getDiscreteStops(min, max, colorSteps, "red");
+
+      const unit = selectedColorMapping === "emergencyCalls" ? "件" : "人";
+      const title =
+        selectedColorMapping === "emergencyCalls"
+          ? "救急出場件数"
+          : "人口密度 (人/km²)";
+
+      // 凡例は高い方から下に向かって表示
+      const entries = stops.map((s, i) => ({ ...s, index: i })).reverse();
 
       return (
         <Box>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: "bold" }}>
-            救急出場件数
+            {title}
           </Typography>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
-                  backgroundColor: "rgb(220, 53, 69)",
-                  borderRadius: 1,
-                  flexShrink: 0,
-                }}
-              />
-              <Typography
-                variant="caption"
-                sx={{ textAlign: "right", flex: 1 }}
-              >
-                {Math.round(maxCalls * 0.8)}件以上
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
-                  backgroundColor: "rgb(255, 108, 0)",
-                  borderRadius: 1,
-                  flexShrink: 0,
-                }}
-              />
-              <Typography
-                variant="caption"
-                sx={{ textAlign: "right", flex: 1 }}
-              >
-                {Math.round(maxCalls * 0.6)}件以上
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
-                  backgroundColor: "rgb(255, 193, 7)",
-                  borderRadius: 1,
-                  flexShrink: 0,
-                }}
-              />
-              <Typography
-                variant="caption"
-                sx={{ textAlign: "right", flex: 1 }}
-              >
-                {Math.round(maxCalls * 0.4)}件以上
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
-                  backgroundColor: "rgb(40, 167, 69)",
-                  borderRadius: 1,
-                  flexShrink: 0,
-                }}
-              />
-              <Typography
-                variant="caption"
-                sx={{ textAlign: "right", flex: 1 }}
-              >
-                {Math.round(maxCalls * 0.2)}件以上
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
-                  backgroundColor: "rgb(0, 123, 255)",
-                  borderRadius: 1,
-                  flexShrink: 0,
-                }}
-              />
-              <Typography
-                variant="caption"
-                sx={{ textAlign: "right", flex: 1 }}
-              >
-                {Math.round(maxCalls * 0.2)}件未満
-              </Typography>
-            </Box>
-          </Box>
-        </Box>
-      );
-    } else if (selectedColorMapping === "populationDensity") {
-      const year = selectedDate.getFullYear();
-      const yearData = populationDensityTimeSeriesData;
-
-      // その年の全データから最大・最小を取得
-      const allYearValues: number[] = [];
-      Object.values(yearData).forEach((areaData) => {
-        if (areaData[year] !== undefined) {
-          allYearValues.push(areaData[year]);
-        }
-      });
-
-      const maxDensity =
-        allYearValues.length > 0
-          ? Math.max(...allYearValues)
-          : Math.max(...Object.values(populationDensityData));
-      const minDensity =
-        allYearValues.length > 0
-          ? Math.min(...allYearValues)
-          : Math.min(...Object.values(populationDensityData));
-      const midDensity = Math.round((maxDensity + minDensity) / 2);
-
-      return (
-        <Box>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: "bold" }}>
-            人口密度 (人/km²)
-          </Typography>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
-                  backgroundColor: "rgb(220, 53, 69)",
-                  borderRadius: 1,
-                  flexShrink: 0,
-                }}
-              />
-              <Typography
-                variant="caption"
-                sx={{ textAlign: "right", flex: 1 }}
-              >
-                {Math.round(maxDensity * 0.8)}人以上
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
-                  backgroundColor: "rgb(255, 108, 0)",
-                  borderRadius: 1,
-                  flexShrink: 0,
-                }}
-              />
-              <Typography
-                variant="caption"
-                sx={{ textAlign: "right", flex: 1 }}
-              >
-                {Math.round(maxDensity * 0.6)}人以上
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
-                  backgroundColor: "rgb(255, 193, 7)",
-                  borderRadius: 1,
-                  flexShrink: 0,
-                }}
-              />
-              <Typography
-                variant="caption"
-                sx={{ textAlign: "right", flex: 1 }}
-              >
-                {Math.round(maxDensity * 0.4)}人以上
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
-                  backgroundColor: "rgb(40, 167, 69)",
-                  borderRadius: 1,
-                  flexShrink: 0,
-                }}
-              />
-              <Typography
-                variant="caption"
-                sx={{ textAlign: "right", flex: 1 }}
-              >
-                {Math.round(maxDensity * 0.2)}人以上
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
-                  backgroundColor: "rgb(0, 123, 255)",
-                  borderRadius: 1,
-                  flexShrink: 0,
-                }}
-              />
-              <Typography
-                variant="caption"
-                sx={{ textAlign: "right", flex: 1 }}
-              >
-                {Math.round(maxDensity * 0.2)}人未満
-              </Typography>
-            </Box>
+            {entries.map(({ color, from, to, index }, idx) => {
+              // ラベル: 中間帯は "from以上to未満"、最上位のみ "from以上"
+              const label =
+                entries.length - 1 === idx
+                  ? `${Math.round(to as number)} ${unit}未満`
+                  : `${Math.round(from)} ${unit}以上`;
+              return (
+                <Box
+                  key={`${index}-${idx}`}
+                  sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                >
+                  <Box
+                    sx={{
+                      width: 16,
+                      height: 16,
+                      backgroundColor: color,
+                      borderRadius: 1,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <Typography
+                    variant="caption"
+                    sx={{ textAlign: "right", flex: 1 }}
+                  >
+                    {label}
+                  </Typography>
+                </Box>
+              );
+            })}
           </Box>
         </Box>
       );
