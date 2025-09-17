@@ -4,65 +4,53 @@
 """
 import os
 from typing import List, Optional, Union
-from pydantic import field_validator
-from pydantic_settings import BaseSettings
 
 
-class Settings(BaseSettings):
+class Settings:
     """アプリケーション設定クラス"""
     
-    # プロジェクト情報
-    PROJECT_NAME: str = "Zone Watch"
-    VERSION: str = "1.0.0"
-    DESCRIPTION: str = "Zone Watch Backend API"
+    def __init__(self):
+        # プロジェクト情報
+        self.PROJECT_NAME: str = "Zone Watch"
+        self.VERSION: str = "1.0.0"
+        self.DESCRIPTION: str = "Zone Watch Backend API"
+        
+        # 環境設定
+        self.ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+        self.DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
+        self.LOG_LEVEL: str = os.getenv("LOG_LEVEL", "DEBUG")
+        
+        # サーバー設定
+        self.HOST: str = os.getenv("BACKEND_HOST", "0.0.0.0")
+        self.PORT: int = int(os.getenv("BACKEND_PORT", "8000"))
+        self.RELOAD: bool = os.getenv("BACKEND_RELOAD", "true").lower() == "true"
+        
+        # データベース設定
+        self.DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://user:password@postgres:5432/mydatabase")
+        
+        # セキュリティ設定
+        self.JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "development-secret-key")
+        self.JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+        self.JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+        
+        # CORS設定
+        self.ALLOWED_HOSTS: List[str] = self._parse_list_env("ALLOWED_HOSTS", ["localhost", "127.0.0.1", "0.0.0.0"])
+        self.CORS_ORIGINS: List[str] = self._parse_list_env("CORS_ORIGINS", ["http://localhost:5173", "http://127.0.0.1:5173"])
+        
+        # MLflow設定
+        self.MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
+        
+        # MinIO設定
+        self.MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
+        self.MINIO_ACCESS_KEY: str = os.getenv("MINIO_ROOT_USER", "minioadmin")
+        self.MINIO_SECRET_KEY: str = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
     
-    # 環境設定
-    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
-    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "DEBUG")
-    
-    # サーバー設定
-    HOST: str = os.getenv("BACKEND_HOST", "0.0.0.0")
-    PORT: int = int(os.getenv("BACKEND_PORT", "8000"))
-    RELOAD: bool = os.getenv("BACKEND_RELOAD", "true").lower() == "true"
-    
-    # データベース設定
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://user:password@postgres:5432/mydatabase")
-    
-    # セキュリティ設定
-    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "development-secret-key")
-    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-    
-    # CORS設定
-    ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1", "0.0.0.0"]
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
-    
-    @field_validator('ALLOWED_HOSTS', mode='before')
-    @classmethod
-    def parse_allowed_hosts(cls, v) -> List[str]:
-        if isinstance(v, str):
-            return [item.strip() for item in v.split(',') if item.strip()]
-        return v
-    
-    @field_validator('CORS_ORIGINS', mode='before')
-    @classmethod
-    def parse_cors_origins(cls, v) -> List[str]:
-        if isinstance(v, str):
-            return [item.strip() for item in v.split(',') if item.strip()]
-        return v
-    
-    # MLflow設定
-    MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
-    
-    # MinIO設定
-    MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
-    MINIO_ACCESS_KEY: str = os.getenv("MINIO_ROOT_USER", "minioadmin")
-    MINIO_SECRET_KEY: str = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    def _parse_list_env(self, env_name: str, default: List[str]) -> List[str]:
+        """環境変数をリストとして解析する"""
+        value = os.getenv(env_name)
+        if not value:
+            return default
+        return [item.strip() for item in value.split(",") if item.strip()]
 
 
 # グローバル設定インスタンス
