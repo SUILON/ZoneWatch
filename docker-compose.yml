@@ -1,16 +1,97 @@
 services:
+  minio:
+    image: minio/minio:latest
+    command: server /data
+    env_file:
+      - .env
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  postgres:
+    image: postgres:15-bullseye
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  mlflow:
+    build:
+      context: ./mlflow-tracking
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+    ports:
+      - "${MLFLOW_PORT}:${MLFLOW_PORT}"
+    command: mlflow server --backend-store-uri ${MLFLOW_BACKEND_STORE_URI} --default-artifact-root ${MLFLOW_DEFAULT_ARTIFACT_ROOT} --host ${MLFLOW_HOST} --port ${MLFLOW_PORT}
+
+  jupyter:
+    build:
+      context: ./jupyter
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "${JUPYTER_PORT}:${JUPYTER_PORT}"
+    volumes:
+      - ./jupyter/notebooks:/work
+    environment:
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      NB_UID: ${NB_UID}
+      NB_GID: ${NB_GID}
+      CHOWN_HOME: ${CHOWN_HOME}
+      CHOWN_HOME_OPTS: ${CHOWN_HOME_OPTS}
+    command: jupyter notebook --port ${JUPYTER_PORT} --ip=0.0.0.0 --notebook-dir='/work' --no-browser --allow-root --NotebookApp.token='${JUPYTER_TOKEN}'
+    depends_on:
+      - mlflow
+    
+    
   backend:
     image: python:3.13-bullseye
     working_dir: /app
-    command: sh -c "pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DEBUG: ${DEBUG}
+      LOG_LEVEL: ${LOG_LEVEL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    command: sh -c "pip install -r requirements.txt && uvicorn main:app --host ${BACKEND_HOST} --port ${BACKEND_PORT} --reload"
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
     volumes:
       - ./backend:/app
+    depends_on:
+      - postgres
+      - mlflow
 
   frontend:
     image: node:22-bullseye-slim
     working_dir: /app
+    env_file:
+      - .env
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+      VITE_MLFLOW_TRACKING_URI: ${VITE_MLFLOW_TRACKING_URI}
+      VITE_APP_TITLE: ${VITE_APP_TITLE}
+      VITE_APP_VERSION: ${VITE_APP_VERSION}
     command: sh -c "npm install -g npm && npm ci && npm run dev -- --host"
     ports:
       - "5173:5173"
@@ -21,4 +102,6 @@ services:
       - backend
 
 volumes:
+  minio_data:
+  pgdata:
   node_modules:

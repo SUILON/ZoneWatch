@@ -1,0 +1,69 @@
+# =============================================================================
+# Zone Watch - Git 除外設定
+# =============================================================================
+
+# 環境変数ファイル（機密情報を含むため除外）
+.env
+.env.local
+.env.production
+.env.development
+.env.test
+
+# ログファイル
+*.log
+logs/
+
+# 一時ファイル
+*.tmp
+*.temp
+.cache/
+
+# OS 固有ファイル
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# エディタ固有ファイル
+.vscode/settings.json
+.idea/
+*.code-workspace
+
+# Docker関連
+.docker/
+
+# データベースファイル
+*.db
+*.sqlite
+*.sqlite3
+
+# バックアップファイル
+*.bak
+*.backup
+backup/
+
+# 証明書ファイル
+*.pem
+*.key
+*.crt
+*.csr
+
+# パッケージ管理
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+pip-log.txt
+pip-delete-this-directory.txt
+
+# MLflow実験データ（ローカル開発時）
+mlruns/
+mlflow.db
+
+# Jupyter チェックポイント
+.ipynb_checkpoints/
+
+# 作業用ディレクトリ
+scratch/
+temp/
+work/
