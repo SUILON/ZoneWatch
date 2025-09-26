@@ -30,7 +30,9 @@ npm run preview      # Preview production build
 ### Backend Development (FastAPI + Python)
 ```bash
 cd backend
-pip install -r requirements.txt    # Install Python dependencies
+uv sync                # Install dependencies using uv (recommended)
+# OR
+pip install -e .       # Install using pip with pyproject.toml
 uvicorn main:app --reload --host 0.0.0.0 --port 8000    # Start development server
 ```
 
@@ -51,8 +53,7 @@ alembic revision --autogenerate -m "description"    # Create new migration
 - **Frontend**: React 19 with TypeScript, Vite, Material-UI, TailwindCSS, and React Leaflet for mapping
 - **Backend**: FastAPI with SQLAlchemy, Alembic for migrations, JWT authentication
 - **Database**: PostgreSQL for primary data storage
-- **ML Platform**: MLflow for experiment tracking and model management
-- **Object Storage**: MinIO for artifact and file storage
+- **ML Platform**: DAGsHub for experiment tracking and model management (remote)
 - **Notebooks**: Jupyter for data analysis and model development
 
 ### Backend Structure
@@ -84,15 +85,15 @@ The application uses environment-based configuration:
 ### Key Technologies
 - **Frontend**: React 19-rc, TypeScript, Vite, Material-UI v7, TailwindCSS v4, Leaflet maps
 - **Backend**: FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2, python-jose for JWT
-- **Infrastructure**: Docker, PostgreSQL 15, MLflow, MinIO, Jupyter
+- **Infrastructure**: Docker, PostgreSQL 15, Jupyter, DAGsHub (remote MLflow)
 
 ### Development Workflow
 1. Copy `.env.example` to `.env` and configure as needed
 2. Use `docker-compose up` to start all services
 3. Frontend available at http://localhost:5173
 4. Backend API at http://localhost:8000 (with auto-docs at /docs)
-5. MLflow UI at http://localhost:5000
-6. Jupyter at http://localhost:8888
+5. Jupyter at http://localhost:8888
+6. MLflow tracking via DAGsHub (remote)
 
 ### Database Schema
 The application uses Alembic for database migrations. The backend uses SQLAlchemy 2.0 modern syntax with async support.
@@ -101,4 +102,4 @@ The application uses Alembic for database migrations. The backend uses SQLAlchem
 JWT-based authentication is configured but not yet implemented in the routes. Security settings are centralized in `app/core/config.py`.
 
 ### ML Integration
-MLflow is integrated for experiment tracking, with MinIO as the artifact store. Jupyter notebooks are available for data analysis and model development.
+MLflow tracking is integrated via DAGsHub for remote experiment tracking and model management. Jupyter notebooks are available for data analysis and model development.

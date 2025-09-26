@@ -1,17 +1,4 @@
 services:
-  minio:
-    image: minio/minio:latest
-    command: server /data
-    env_file:
-      - .env
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
 
   postgres:
     image: postgres:15-bullseye
@@ -26,17 +13,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  mlflow:
-    build:
-      context: ./mlflow-tracking
-      dockerfile: Dockerfile
-    env_file:
-      - .env
-    environment:
-      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
-    ports:
-      - "${MLFLOW_PORT}:${MLFLOW_PORT}"
-    command: mlflow server --backend-store-uri ${MLFLOW_BACKEND_STORE_URI} --default-artifact-root ${MLFLOW_DEFAULT_ARTIFACT_ROOT} --host ${MLFLOW_HOST} --port ${MLFLOW_PORT}
+
 
   jupyter:
     build:
@@ -50,18 +27,18 @@ services:
       - ./jupyter/notebooks:/work
     environment:
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      DAGSHUB_USER_TOKEN: ${DAGSHUB_USER_TOKEN}
       NB_UID: ${NB_UID}
       NB_GID: ${NB_GID}
       CHOWN_HOME: ${CHOWN_HOME}
       CHOWN_HOME_OPTS: ${CHOWN_HOME_OPTS}
     command: jupyter notebook --port ${JUPYTER_PORT} --ip=0.0.0.0 --notebook-dir='/work' --no-browser --allow-root --NotebookApp.token='${JUPYTER_TOKEN}'
-    depends_on:
-      - mlflow
     
     
   backend:
-    image: python:3.13-bullseye
-    working_dir: /app
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     env_file:
       - .env
     environment:
@@ -73,14 +50,15 @@ services:
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS}
       CORS_ORIGINS: ${CORS_ORIGINS}
-    command: sh -c "pip install -r requirements.txt && uvicorn main:app --host ${BACKEND_HOST} --port ${BACKEND_PORT} --reload"
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      DAGSHUB_USER_TOKEN: ${DAGSHUB_USER_TOKEN}
+    command: uvicorn main:app --host ${BACKEND_HOST} --port ${BACKEND_PORT} --reload
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     volumes:
       - ./backend:/app
     depends_on:
       - postgres
-      - mlflow
 
   frontend:
     image: node:22-bullseye-slim
@@ -102,6 +80,5 @@ services:
       - backend
 
 volumes:
-  minio_data:
   pgdata:
   node_modules:
