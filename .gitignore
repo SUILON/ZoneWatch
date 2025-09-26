@@ -56,10 +56,6 @@ __pycache__/
 pip-log.txt
 pip-delete-this-directory.txt
 
-# MLflow実験データ（ローカル開発時）
-mlruns/
-mlflow.db
-
 # Jupyter チェックポイント
 .ipynb_checkpoints/
 
@@ -67,3 +63,7 @@ mlflow.db
 scratch/
 temp/
 work/
+
+# claude関連
+.claude/
+.serena/
