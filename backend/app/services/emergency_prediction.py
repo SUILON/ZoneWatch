@@ -48,12 +48,12 @@ class EmergencyPredictionService:
         logger.info(f"MLflow tracking URI set to: {settings.MLFLOW_TRACKING_URI}")
 
         # DAGsHubトークンが設定されている場合は環境変数に設定
-        if settings.DAGSHUB_USER_TOKEN and settings.DAGSHUB_USERNAME:
-            os.environ["MLFLOW_TRACKING_USERNAME"] = settings.DAGSHUB_USERNAME
+        if settings.DAGSHUB_USER_TOKEN and settings.DAGSHUB_USER_NAME:
+            os.environ["MLFLOW_TRACKING_USERNAME"] = settings.DAGSHUB_USER_NAME
             os.environ["MLFLOW_TRACKING_PASSWORD"] = settings.DAGSHUB_USER_TOKEN
-            logger.info(f"DAGsHub authentication configured for user: {settings.DAGSHUB_USERNAME}")
+            logger.info(f"DAGsHub authentication configured for user: {settings.DAGSHUB_USER_NAME}")
         else:
-            logger.warning("DAGSHUB_USER_TOKEN or DAGSHUB_USERNAME not set - model loading may fail")
+            logger.warning("DAGSHUB_USER_TOKEN or DAGSHUB_USER_NAME not set - model loading may fail")
 
         # クライアントを作成するが接続テストはスキップ（遅延読み込み）
         self.client = MlflowClient()

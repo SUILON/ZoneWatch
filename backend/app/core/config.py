@@ -38,7 +38,7 @@ class Settings:
         # MLflow設定（DAGsHub用）
         self.MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "")
         self.DAGSHUB_USER_TOKEN: str = os.getenv("DAGSHUB_USER_TOKEN", "")
-        self.DAGSHUB_USERNAME: str = os.getenv("DAGSHUB_USERNAME", "")
+        self.DAGSHUB_USER_NAME: str = os.getenv("DAGSHUB_USER_NAME", "")
 
         # MinIO設定
         self.MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
