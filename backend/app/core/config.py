@@ -36,7 +36,7 @@ class Settings:
         self.CORS_ORIGINS: list[str] = self._parse_list_env("CORS_ORIGINS", ["http://localhost:5173", "http://127.0.0.1:5173"])
 
         # MLflow設定（DAGsHub用）
-        self.MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "https://dagshub.com/username/repository.mlflow")
+        self.MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "https://dagshub.com/yuki-mtmr/zone-watch.mlflow")
         self.DAGSHUB_USER_TOKEN: str = os.getenv("DAGSHUB_USER_TOKEN", "")
 
         # MinIO設定

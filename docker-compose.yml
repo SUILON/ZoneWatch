@@ -52,7 +52,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS}
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
       DAGSHUB_USER_TOKEN: ${DAGSHUB_USER_TOKEN}
-    command: uvicorn main:app --host ${BACKEND_HOST} --port ${BACKEND_PORT} --reload
+    command: uvicorn app.main:app --host ${BACKEND_HOST} --port ${BACKEND_PORT} --reload
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     volumes:

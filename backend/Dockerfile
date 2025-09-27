@@ -1,7 +1,11 @@
-FROM python:3.13-bullseye
+FROM python:3.13-slim
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # Create a non-root user
 RUN useradd --create-home --shell /bin/bash app
@@ -9,11 +13,11 @@ RUN useradd --create-home --shell /bin/bash app
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first (for better layer caching)
-COPY requirements.txt /app/
+# Copy pyproject.toml first (for better layer caching)
+COPY pyproject.toml /app/
 
-# Install dependencies globally using uv
-RUN uv pip install --system -r requirements.txt
+# Install dependencies using uv with pyproject.toml
+RUN uv sync --frozen --no-dev || uv pip install --system .
 
 # Copy the rest of the application
 COPY . /app/
@@ -24,5 +28,8 @@ RUN chown -R app:app /app
 # Switch to non-root user
 USER app
 
+# Expose port
+EXPOSE 8000
+
 # Command will be overridden by docker-compose
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
