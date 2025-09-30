@@ -48,11 +48,7 @@ const MapController: React.FC<{
 
   // マップのリサイズを処理
   useEffect(() => {
-    if (triggerResize !== undefined) {
-      setTimeout(() => {
-        map.invalidateSize();
-      }, 300); // アニメーション完了後にリサイズ
-    }
+    map.invalidateSize();
   }, [map, triggerResize]);
 
   return null;
@@ -473,6 +469,7 @@ const Heatmap: React.FC<HeatmapProps> = () => {
             <MapController center={mapCenter} zoom={mapZoom} triggerResize={resizeTrigger} />
             {geoJsonData && (
               <GeoJSON
+                key={`${selectedDepartment}-${selectedColorMapping}-${selectedDate.getTime()}-${mapPanelWidth}`}
                 data={geoJsonData}
                 style={getFeatureStyle}
                 onEachFeature={onEachFeature}
