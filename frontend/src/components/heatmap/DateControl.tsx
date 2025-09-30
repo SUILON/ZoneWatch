@@ -109,9 +109,9 @@ export const DateControl: React.FC<DateControlProps> = ({
       </Box>
 
       {/* 年、月、日のボタン操作 */}
-      <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+      <Box sx={{ display: "flex", gap: 1, mb: 2, justifyContent: "center" }}>
         {/* 年 */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, outline: "1px solid #ccc", borderRadius: "4px" }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-around", width: "30%", gap: 0.5, outline: "1px solid #ccc", borderRadius: "4px" }}>
           <IconButton
             size="small"
             onClick={() => onYearChange(-1)}
@@ -119,7 +119,7 @@ export const DateControl: React.FC<DateControlProps> = ({
           >
             <RemoveIcon fontSize="small" />
           </IconButton>
-          <Typography variant="body2" sx={{ minWidth: "40px", textAlign: "center" }}>
+          <Typography variant="body2" sx={{ minWidth: "20px", textAlign: "center" }}>
             {selectedDate.getFullYear()}
           </Typography>
           <IconButton
@@ -132,7 +132,7 @@ export const DateControl: React.FC<DateControlProps> = ({
         </Box>
 
         {/* 月 */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, outline: "1px solid #ccc", borderRadius: "4px" }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-around", width: "30%", gap: 0.5, outline: "1px solid #ccc", borderRadius: "4px" }}>
           <IconButton
             size="small"
             onClick={() => onMonthChange(-1)}
@@ -153,7 +153,7 @@ export const DateControl: React.FC<DateControlProps> = ({
         </Box>
 
         {/* 日 */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, outline: "1px solid #ccc", borderRadius: "4px" }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-around", width: "30%", gap: 0.5, outline: "1px solid #ccc", borderRadius: "4px" }}>
           <IconButton
             size="small"
             onClick={() => onDayChange(-1)}

@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import CenterFocusStrongIcon from "@mui/icons-material/CenterFocusStrong";
 import {
   Box,
-  Typography,
   FormControl,
   InputLabel,
   Select,
@@ -10,14 +9,13 @@ import {
   Paper,
   IconButton,
 } from "@mui/material";
-import { MapContainer, GeoJSON, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, GeoJSON, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import ScrollableContainer from "@/components/common/ScrollableContainer";
 import {
   asahiFireDepartmentData,
   allViewMapSettings,
 } from "@/data/fireDepartmentData";
-import { sampleBadgeData, dataTypes } from "@/data/badgeData";
 import {
   dateToValue,
   valueToDate,
@@ -25,16 +23,14 @@ import {
   formatDate,
   getDepartmentForArea,
   getColorForAreaByMapping,
-  createCustomIcon,
 } from "@/utils/heatmapUtils";
 import { LegendComponent } from "@/components/heatmap/LegendComponent";
 import { DateControl } from "@/components/heatmap/DateControl";
-import { DataTypeSelector } from "@/components/heatmap/DataTypeSelector";
 import { ColorMappingSelector } from "@/components/heatmap/ColorMappingSelector";
 import { colorMappingOptions } from "@/data/colorMappingData";
 
 import type { SelectChangeEvent } from "@mui/material/Select";
-import type { BadgeData, ColorMappingType } from "@/types/HeatmapTypes";
+import type { ColorMappingType } from "@/types/HeatmapTypes";
 
 const MapController: React.FC<{
   center: [number, number];
@@ -52,6 +48,10 @@ const MapController: React.FC<{
   return null;
 };
 
+const PANEL_MIN_WIDTH_PERCENT = 35;
+const PANEL_MAX_WIDTH_PERCENT = 75;
+const CONTROL_MIN_WIDTH_PX = 360;
+
 interface HeatmapProps {
   title?: string;
 }
@@ -63,11 +63,15 @@ const Heatmap: React.FC<HeatmapProps> = () => {
     allViewMapSettings.center
   );
   const [mapZoom, setMapZoom] = useState<number>(allViewMapSettings.zoom);
-  const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([]);
-  const [badgeData] = useState<BadgeData[]>(sampleBadgeData);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedColorMapping, setSelectedColorMapping] =
     useState<ColorMappingType>("emergencyCalls");
+  const [mapPanelWidth, setMapPanelWidth] = useState<number>(60);
+  const [lastExpandedMapWidth, setLastExpandedMapWidth] =
+    useState<number>(60);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isControlCollapsed, setIsControlCollapsed] = useState<boolean>(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   // カラーステップ数（凡例/塗りつぶしで共通利用）
   const colorSteps = 5;
 
@@ -75,6 +79,78 @@ const Heatmap: React.FC<HeatmapProps> = () => {
   const minDate = new Date(2002, 0, 1);
   const maxDate = new Date(2030, 11, 31);
   const predictionStartDate = new Date(2024, 11, 31);
+
+  const updateWidthFromClientX = useCallback((clientX: number) => {
+    const container = containerRef.current;
+    if (!container || isControlCollapsed) return;
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0) return;
+
+    const relativeX = clientX - rect.left;
+    const rawWidthPercent = (relativeX / rect.width) * 100;
+
+    const absoluteMax = 100 - (CONTROL_MIN_WIDTH_PX / rect.width) * 100;
+    const maxAllowed = Math.max(
+      PANEL_MIN_WIDTH_PERCENT,
+      Math.min(PANEL_MAX_WIDTH_PERCENT, absoluteMax)
+    );
+
+    const nextWidth = Math.min(
+      maxAllowed,
+      Math.max(PANEL_MIN_WIDTH_PERCENT, rawWidthPercent)
+    );
+
+    setMapPanelWidth(nextWidth);
+    setLastExpandedMapWidth(nextWidth);
+  }, [isControlCollapsed]);
+
+  const handleDragStart = useCallback(
+    (
+      event:
+        | React.MouseEvent<HTMLDivElement>
+        | React.TouchEvent<HTMLDivElement>
+    ) => {
+      event.preventDefault();
+      const clientX =
+        "touches" in event ? event.touches[0]?.clientX : event.clientX;
+      if (typeof clientX === "number") {
+        updateWidthFromClientX(clientX);
+      }
+      setIsDragging(true);
+    },
+    [updateWidthFromClientX]
+  );
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      updateWidthFromClientX(event.clientX);
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (touch) {
+        updateWidthFromClientX(touch.clientX);
+      }
+    };
+
+    const stopDragging = () => setIsDragging(false);
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("touchmove", handleTouchMove);
+    window.addEventListener("mouseup", stopDragging);
+    window.addEventListener("touchend", stopDragging);
+    window.addEventListener("touchcancel", stopDragging);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("mouseup", stopDragging);
+      window.removeEventListener("touchend", stopDragging);
+      window.removeEventListener("touchcancel", stopDragging);
+    };
+  }, [isDragging, updateWidthFromClientX]);
 
   // 日付スライダーの値変更ハンドラー
   const handleDateChange = (_event: Event, newValue: number | number[]) => {
@@ -114,22 +190,6 @@ const Heatmap: React.FC<HeatmapProps> = () => {
     if (inputDate >= minDate && inputDate <= maxDate) {
       setSelectedDate(inputDate);
     }
-  };
-
-  // データタイプ選択のハンドラー
-  const handleDataTypeChange = (dataType: string) => {
-    setSelectedDataTypes((prev) => {
-      if (prev.includes(dataType)) {
-        return prev.filter((type) => type !== dataType);
-      } else {
-        return [...prev, dataType];
-      }
-    });
-  };
-
-  // すべてのデータタイプをクリアするハンドラー
-  const handleClearAllDataTypes = () => {
-    setSelectedDataTypes([]);
   };
 
   // 今日の日付に設定するハンドラー
@@ -297,22 +357,66 @@ const Heatmap: React.FC<HeatmapProps> = () => {
     setMapPositionForDepartment(selectedDepartment);
   };
 
+  // コントロールエリアの開閉トグル
+  const handleTogglePanel = useCallback(() => {
+    if (isControlCollapsed) {
+      let restoredWidth = lastExpandedMapWidth;
+      const container = containerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        if (rect.width > 0) {
+          const absoluteMax = 100 - (CONTROL_MIN_WIDTH_PX / rect.width) * 100;
+          if (absoluteMax > PANEL_MIN_WIDTH_PERCENT) {
+            const maxAllowed = Math.min(PANEL_MAX_WIDTH_PERCENT, absoluteMax);
+            restoredWidth = Math.min(
+              Math.max(PANEL_MIN_WIDTH_PERCENT, restoredWidth),
+              maxAllowed
+            );
+          } else {
+            restoredWidth = PANEL_MIN_WIDTH_PERCENT;
+          }
+        }
+      }
+      setMapPanelWidth(restoredWidth);
+      setIsControlCollapsed(false);
+    } else {
+      setLastExpandedMapWidth(mapPanelWidth);
+      setIsControlCollapsed(true);
+    }
+  }, [isControlCollapsed, lastExpandedMapWidth, mapPanelWidth]);
+
   return (
-    <ScrollableContainer additionalSx={{ p: 2, height: "100%" }}>
-      <Box sx={{ display: "flex", height: "100%", gap: 3, alignItems: "flex-start" }}>
-        {/* 地図エリア */}
+    <ScrollableContainer
+      additionalSx={{
+        p: 2,
+        height: "100%",
+        userSelect: isDragging ? "none" : "auto",
+        touchAction: isDragging ? "none" : "auto",
+      }}
+    >
+      <Box
+        ref={containerRef}
+        sx={{
+          display: "flex",
+          height: "100%",
+          alignItems: "stretch",
+          gap: 0,
+        }}
+      >
         <Box
           sx={{
-            flex: 1,
-            height: "100%",
-            minWidth: "350px",
+            flexBasis: isControlCollapsed ? "auto" : `${mapPanelWidth}%`,
+            flexGrow: isControlCollapsed ? 1 : 0,
+            flexShrink: isControlCollapsed ? 1 : 0,
+            minWidth: "320px",
+            minHeight: "500px",
             border: "1px solid #ccc",
             borderRadius: 1,
             position: "relative",
-            transition: "height 0.3s ease-in-out",
+            overflow: "hidden",
+            transition: isDragging ? "none" : "flex-basis 0.2s ease",
           }}
         >
-          {/* 地図上の位置リセットボタン */}
           <IconButton
             onClick={handleResetMapPosition}
             sx={{
@@ -333,12 +437,8 @@ const Heatmap: React.FC<HeatmapProps> = () => {
             <CenterFocusStrongIcon />
           </IconButton>
 
-          {/* 凡例 */}
           <LegendComponent
             asahiFireDepartmentData={asahiFireDepartmentData}
-            dataTypes={dataTypes}
-            selectedDataTypes={selectedDataTypes}
-            badgeData={badgeData}
             selectedColorMapping={selectedColorMapping}
             selectedDate={selectedDate}
             colorSteps={colorSteps}
@@ -359,146 +459,128 @@ const Heatmap: React.FC<HeatmapProps> = () => {
                 onEachFeature={onEachFeature}
               />
             )}
-
-            {/* バッジ（マーカー）の表示 */}
-            {badgeData
-              .filter((badge) => selectedDataTypes.includes(badge.type))
-              .map((badge) => (
-                <Marker
-                  key={badge.id}
-                  position={badge.position}
-                  icon={createCustomIcon(badge)}
-                >
-                  <Popup>
-                    <Box sx={{ minWidth: 200 }}>
-                      <Typography
-                        variant="h6"
-                        sx={{ color: badge.color, mb: 1 }}
-                      >
-                        {badge.name}
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        <strong>種別:</strong> {badge.type}
-                      </Typography>
-                      {badge.details && (
-                        <>
-                          {badge.details.address && (
-                            <Typography variant="body2" sx={{ mb: 0.5 }}>
-                              <strong>住所:</strong> {badge.details.address}
-                            </Typography>
-                          )}
-                          {badge.details.phone && (
-                            <Typography variant="body2" sx={{ mb: 0.5 }}>
-                              <strong>電話:</strong> {badge.details.phone}
-                            </Typography>
-                          )}
-                          {badge.details.type && (
-                            <Typography variant="body2" sx={{ mb: 0.5 }}>
-                              <strong>分類:</strong> {badge.details.type}
-                            </Typography>
-                          )}
-                          {badge.details.line && (
-                            <Typography variant="body2" sx={{ mb: 0.5 }}>
-                              <strong>路線:</strong> {badge.details.line}
-                            </Typography>
-                          )}
-                          {badge.details.density && (
-                            <Typography variant="body2" sx={{ mb: 0.5 }}>
-                              <strong>人口密度:</strong> {badge.details.density}
-                            </Typography>
-                          )}
-                        </>
-                      )}
-                    </Box>
-                  </Popup>
-                </Marker>
-              ))}
           </MapContainer>
         </Box>
 
-        {/* 操作エリア */}
-        <Paper
-          sx={{
-            width: "350px",
-            flexShrink: 0,
-            boxShadow: 1,
+        <Box
+          role="separator"
+          aria-orientation="vertical"
+          aria-expanded={!isControlCollapsed}
+          tabIndex={0}
+          onMouseDown={handleDragStart}
+          onTouchStart={handleDragStart}
+          onDoubleClick={handleTogglePanel}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              handleTogglePanel();
+            }
           }}
+          sx={{
+            width: isControlCollapsed ? "16px" : "8px",
+            cursor: "col-resize",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            px: "2px",
+            outline: "none",
+            "&:focus-visible": {
+              boxShadow: (theme) => `0 0 0 2px ${theme.palette.primary.main}`,
+              borderRadius: "4px",
+            },
+          }}
+          title={
+            isControlCollapsed ? "コントロールを再表示" : "幅を調整 (ダブルクリックで折りたたみ)"
+          }
         >
-          {/* ヘッダー部分 */}
           <Box
             sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              p: 2,
-              pb: 1,
+              width: "2px",
+              height: "40px",
+              borderRadius: "1px",
+              backgroundColor: isDragging
+                ? "primary.main"
+                : isControlCollapsed
+                ? "primary.main"
+                : "divider",
             }}
-          ></Box>
+          />
+        </Box>
 
-          {/* コントロール部分 */}
-          <Box sx={{ p: 2, pt: 1 }}>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {/* 管轄消防署選択 */}
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <FormControl sx={{ width: "100%" }}>
-                  <InputLabel id="department-select-label">
-                    管轄消防署
-                  </InputLabel>
-                  <Select
-                    labelId="department-select-label"
-                    id="department-select"
-                    value={selectedDepartment}
-                    label="管轄消防署"
-                    onChange={handleDepartmentChange}
-                  >
-                    <MenuItem value="all">すべて表示</MenuItem>
-                    <MenuItem value="main">
-                      {asahiFireDepartmentData.mainStation.name}
-                    </MenuItem>
-                    {asahiFireDepartmentData.branches.map((branch: any) => (
-                      <MenuItem key={branch.name} value={branch.name}>
-                        {branch.name}
+        {!isControlCollapsed && (
+          <Paper
+            sx={{
+              flexGrow: 1,
+              minWidth: "260px",
+              boxShadow: 1,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                p: 2,
+                pb: 1,
+              }}
+            ></Box>
+
+            <Box sx={{ p: 2, pt: 1 }}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <FormControl sx={{ width: "100%" }}>
+                    <InputLabel id="department-select-label">
+                      管轄消防署
+                    </InputLabel>
+                    <Select
+                      labelId="department-select-label"
+                      id="department-select"
+                      value={selectedDepartment}
+                      label="管轄消防署"
+                      onChange={handleDepartmentChange}
+                    >
+                      <MenuItem value="all">すべて表示</MenuItem>
+                      <MenuItem value="main">
+                        {asahiFireDepartmentData.mainStation.name}
                       </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                      {asahiFireDepartmentData.branches.map((branch: any) => (
+                        <MenuItem key={branch.name} value={branch.name}>
+                          {branch.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Box>
+
+                <ColorMappingSelector
+                  colorMappingOptions={colorMappingOptions}
+                  selectedColorMapping={selectedColorMapping}
+                  onColorMappingChange={setSelectedColorMapping}
+                />
+
+                <DateControl
+                  selectedDate={selectedDate}
+                  minDate={minDate}
+                  maxDate={maxDate}
+                  predictionStartDate={predictionStartDate}
+                  onDateChange={handleDateChange}
+                  onYearChange={handleYearChange}
+                  onMonthChange={handleMonthChange}
+                  onDayChange={handleDayChange}
+                  onDateInputChange={handleDateInputChange}
+                  dateToValue={dateToValue}
+                  valueToDate={valueToDate}
+                  formatDate={formatDate}
+                  isPredictionPeriod={isPredictionPeriod}
+                  onSetToToday={handleSetToToday}
+                />
               </Box>
-
-              {/* カラーマッピング選択 */}
-              <ColorMappingSelector
-                colorMappingOptions={colorMappingOptions}
-                selectedColorMapping={selectedColorMapping}
-                onColorMappingChange={setSelectedColorMapping}
-              />
-
-              {/* 日付コントロール */}
-              <DateControl
-                selectedDate={selectedDate}
-                minDate={minDate}
-                maxDate={maxDate}
-                predictionStartDate={predictionStartDate}
-                onDateChange={handleDateChange}
-                onYearChange={handleYearChange}
-                onMonthChange={handleMonthChange}
-                onDayChange={handleDayChange}
-                onDateInputChange={handleDateInputChange}
-                dateToValue={dateToValue}
-                valueToDate={valueToDate}
-                formatDate={formatDate}
-                isPredictionPeriod={isPredictionPeriod}
-                onSetToToday={handleSetToToday}
-              />
-              {/* データタイプ選択 */}
-              <DataTypeSelector
-                dataTypes={dataTypes}
-                selectedDataTypes={selectedDataTypes}
-                badgeData={badgeData}
-                onDataTypeChange={handleDataTypeChange}
-                onClearAll={handleClearAllDataTypes}
-              />
             </Box>
-          </Box>
-        </Paper>
+          </Paper>
+        )}
       </Box>
     </ScrollableContainer>
   );

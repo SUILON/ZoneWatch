@@ -1,9 +1,7 @@
 import React from "react";
-import { Box, Typography, Paper, Chip, Divider } from "@mui/material";
+import { Box, Typography, Paper } from "@mui/material";
 import type {
   FireDepartmentData,
-  DataType,
-  BadgeData,
   ColorMappingType,
 } from "@/types/HeatmapTypes";
 import {
@@ -14,9 +12,6 @@ import { getDiscreteStops } from "@/utils/heatmapUtils";
 
 interface LegendComponentProps {
   asahiFireDepartmentData: FireDepartmentData;
-  dataTypes: DataType[];
-  selectedDataTypes: string[];
-  badgeData: BadgeData[];
   selectedColorMapping?: ColorMappingType;
   selectedDate?: Date;
   colorSteps?: number; // ヒートマップ段階数（可変）
@@ -24,9 +19,6 @@ interface LegendComponentProps {
 
 export const LegendComponent: React.FC<LegendComponentProps> = ({
   asahiFireDepartmentData,
-  dataTypes,
-  selectedDataTypes,
-  badgeData,
   selectedColorMapping = "fireDepartment",
   selectedDate = new Date(),
   colorSteps = 5,
@@ -163,37 +155,6 @@ export const LegendComponent: React.FC<LegendComponentProps> = ({
       }}
     >
       {getLegendContent()}
-
-      {selectedDataTypes.length > 0 && (
-        <>
-          <Divider sx={{ my: 1 }} />
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: "bold" }}>
-              表示中のマーカー
-            </Typography>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-              {selectedDataTypes.map((type) => {
-                const dataType = dataTypes.find((dt) => dt.key === type);
-                const count = badgeData.filter(
-                  (badge) => badge.type === type
-                ).length;
-                return (
-                  <Chip
-                    key={type}
-                    label={`${dataType?.label || type} (${count})`}
-                    size="small"
-                    sx={{
-                      backgroundColor: dataType?.color || "#ccc",
-                      color: "white",
-                      fontSize: "0.7rem",
-                    }}
-                  />
-                );
-              })}
-            </Box>
-          </Box>
-        </>
-      )}
     </Paper>
   );
 };
