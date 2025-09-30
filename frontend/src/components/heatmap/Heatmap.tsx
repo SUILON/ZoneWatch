@@ -512,7 +512,7 @@ const Heatmap: React.FC<HeatmapProps> = () => {
           <Paper
             sx={{
               flexGrow: 1,
-              minWidth: "260px",
+              minWidth: `${CONTROL_MIN_WIDTH_PX}px`,
               boxShadow: 1,
               display: "flex",
               flexDirection: "column",

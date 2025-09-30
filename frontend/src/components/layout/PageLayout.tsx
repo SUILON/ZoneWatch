@@ -11,7 +11,7 @@ interface PageLayoutProps {
 // 静的なスタイルオブジェクトを定義
 const containerStyle = {
   display: "flex",
-  height: "100vh",
+  height: "100vh"
 };
 
 const mainStyle = {
