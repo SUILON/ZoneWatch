@@ -35,7 +35,8 @@ import type { ColorMappingType } from "@/types/HeatmapTypes";
 const MapController: React.FC<{
   center: [number, number];
   zoom: number;
-}> = ({ center, zoom }) => {
+  triggerResize?: number;
+}> = ({ center, zoom, triggerResize }) => {
   const map = useMap();
 
   useEffect(() => {
@@ -44,6 +45,15 @@ const MapController: React.FC<{
       map.setView(center, zoom, { animate: true, duration: 0.5 });
     }, 100);
   }, [map, center, zoom]);
+
+  // マップのリサイズを処理
+  useEffect(() => {
+    if (triggerResize !== undefined) {
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 300); // アニメーション完了後にリサイズ
+    }
+  }, [map, triggerResize]);
 
   return null;
 };
@@ -71,6 +81,7 @@ const Heatmap: React.FC<HeatmapProps> = () => {
     useState<number>(60);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isControlCollapsed, setIsControlCollapsed] = useState<boolean>(false);
+  const [resizeTrigger, setResizeTrigger] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   // カラーステップ数（凡例/塗りつぶしで共通利用）
   const colorSteps = 5;
@@ -151,6 +162,16 @@ const Heatmap: React.FC<HeatmapProps> = () => {
       window.removeEventListener("touchcancel", stopDragging);
     };
   }, [isDragging, updateWidthFromClientX]);
+
+  // マップパネル幅の変更を監視してマップリサイズをトリガー
+  useEffect(() => {
+    if (!isDragging) {
+      const timeoutId = setTimeout(() => {
+        setResizeTrigger(prev => prev + 1);
+      }, 250); // ドラッグ完了後少し待ってからリサイズ
+      return () => clearTimeout(timeoutId);
+    }
+  }, [mapPanelWidth, isControlCollapsed, isDragging]);
 
   // 日付スライダーの値変更ハンドラー
   const handleDateChange = (_event: Event, newValue: number | number[]) => {
@@ -445,15 +466,13 @@ const Heatmap: React.FC<HeatmapProps> = () => {
           />
 
           <MapContainer
-            key={`${mapCenter[0]}-${mapCenter[1]}-${mapZoom}`}
             center={allViewMapSettings.center}
             zoom={allViewMapSettings.zoom}
             style={{ height: "100%", width: "100%" }}
           >
-            <MapController center={mapCenter} zoom={mapZoom} />
+            <MapController center={mapCenter} zoom={mapZoom} triggerResize={resizeTrigger} />
             {geoJsonData && (
               <GeoJSON
-                key={`${selectedDepartment}-${selectedColorMapping}-${selectedDate.getTime()}`}
                 data={geoJsonData}
                 style={getFeatureStyle}
                 onEachFeature={onEachFeature}
