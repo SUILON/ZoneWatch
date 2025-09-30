@@ -15,7 +15,7 @@ const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
   return (
     <Box
       sx={{
-        height: "calc(100vh - 120px)", // タブヘッダーとパディングを考慮して調整
+        height: "100%", // パーセンテージベースの高さ
         overflow: "auto",
         // カスタムスクロールバー
         "&::-webkit-scrollbar": {

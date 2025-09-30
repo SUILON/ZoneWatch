@@ -298,13 +298,13 @@ const Heatmap: React.FC<HeatmapProps> = () => {
   };
 
   return (
-    <ScrollableContainer additionalSx={{ p: 2, height: "100vh" }}>
-      <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
+    <ScrollableContainer additionalSx={{ p: 2, height: "100%" }}>
+      <Box sx={{ display: "flex", height: "100%", gap: 3, alignItems: "flex-start" }}>
         {/* 地図エリア */}
         <Box
           sx={{
             flex: 1,
-            height: "600px",
+            height: "100%",
             minWidth: "350px",
             border: "1px solid #ccc",
             borderRadius: 1,
