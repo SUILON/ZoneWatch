@@ -111,6 +111,34 @@ const Heatmap: React.FC<HeatmapProps> = () => {
     setLastExpandedMapWidth(nextWidth);
   }, [isControlCollapsed]);
 
+  // コントロールエリアの開閉トグル
+  const handleTogglePanel = useCallback(() => {
+    if (isControlCollapsed) {
+      let restoredWidth = lastExpandedMapWidth;
+      const container = containerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        if (rect.width > 0) {
+          const absoluteMax = 100 - (CONTROL_MIN_WIDTH_PX / rect.width) * 100;
+          if (absoluteMax > PANEL_MIN_WIDTH_PERCENT) {
+            const maxAllowed = Math.min(PANEL_MAX_WIDTH_PERCENT, absoluteMax);
+            restoredWidth = Math.min(
+              Math.max(PANEL_MIN_WIDTH_PERCENT, restoredWidth),
+              maxAllowed
+            );
+          } else {
+            restoredWidth = PANEL_MIN_WIDTH_PERCENT;
+          }
+        }
+      }
+      setMapPanelWidth(restoredWidth);
+      setIsControlCollapsed(false);
+    } else {
+      setLastExpandedMapWidth(mapPanelWidth);
+      setIsControlCollapsed(true);
+    }
+  }, [isControlCollapsed, lastExpandedMapWidth, mapPanelWidth]);
+
   const handleDragStart = useCallback(
     (
       event:
@@ -374,34 +402,6 @@ const Heatmap: React.FC<HeatmapProps> = () => {
     setMapPositionForDepartment(selectedDepartment);
   };
 
-  // コントロールエリアの開閉トグル
-  const handleTogglePanel = useCallback(() => {
-    if (isControlCollapsed) {
-      let restoredWidth = lastExpandedMapWidth;
-      const container = containerRef.current;
-      if (container) {
-        const rect = container.getBoundingClientRect();
-        if (rect.width > 0) {
-          const absoluteMax = 100 - (CONTROL_MIN_WIDTH_PX / rect.width) * 100;
-          if (absoluteMax > PANEL_MIN_WIDTH_PERCENT) {
-            const maxAllowed = Math.min(PANEL_MAX_WIDTH_PERCENT, absoluteMax);
-            restoredWidth = Math.min(
-              Math.max(PANEL_MIN_WIDTH_PERCENT, restoredWidth),
-              maxAllowed
-            );
-          } else {
-            restoredWidth = PANEL_MIN_WIDTH_PERCENT;
-          }
-        }
-      }
-      setMapPanelWidth(restoredWidth);
-      setIsControlCollapsed(false);
-    } else {
-      setLastExpandedMapWidth(mapPanelWidth);
-      setIsControlCollapsed(true);
-    }
-  }, [isControlCollapsed, lastExpandedMapWidth, mapPanelWidth]);
-
   return (
     <ScrollableContainer
       additionalSx={{
@@ -483,8 +483,15 @@ const Heatmap: React.FC<HeatmapProps> = () => {
           aria-orientation="vertical"
           aria-expanded={!isControlCollapsed}
           tabIndex={0}
-          onMouseDown={handleDragStart}
-          onTouchStart={handleDragStart}
+          onMouseDown={!isControlCollapsed ? handleDragStart : undefined}
+          onTouchStart={!isControlCollapsed ? handleDragStart : undefined}
+          onClick={(event) => {
+            // コントロールパネルが閉じている場合はクリックで展開
+            if (isControlCollapsed) {
+              event.preventDefault();
+              handleTogglePanel();
+            }
+          }}
           onDoubleClick={handleTogglePanel}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -494,7 +501,7 @@ const Heatmap: React.FC<HeatmapProps> = () => {
           }}
           sx={{
             width: isControlCollapsed ? "16px" : "8px",
-            cursor: "col-resize",
+            cursor: isControlCollapsed ? "pointer" : "col-resize",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -507,13 +514,13 @@ const Heatmap: React.FC<HeatmapProps> = () => {
             },
           }}
           title={
-            isControlCollapsed ? "コントロールを再表示" : "幅を調整 (ダブルクリックで折りたたみ)"
+            isControlCollapsed ? "クリックでコントロールを再表示" : "幅を調整 (ダブルクリックで折りたたみ)"
           }
         >
           <Box
             sx={{
-              width: "2px",
-              height: "40px",
+              width: "3px",
+              height: "90px",
               borderRadius: "1px",
               backgroundColor: isDragging
                 ? "primary.main"
