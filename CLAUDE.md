@@ -11,10 +11,10 @@ Zone Watch is a full-stack web application with machine learning capabilities fo
 ### Starting the Development Environment
 ```bash
 # Start all services (recommended for development)
-docker-compose up
+docker compose up
 
 # Start specific services only
-docker-compose up backend frontend postgres
+docker compose up backend frontend postgres
 ```
 
 ### Frontend Development (React + TypeScript + Vite)
@@ -39,7 +39,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000    # Start development serv
 ### Database Operations
 ```bash
 # Access PostgreSQL database
-docker-compose exec postgres psql -U user -d mydatabase
+docker compose exec postgres psql -U user -d mydatabase
 
 # Run Alembic migrations (from backend directory)
 cd backend
@@ -89,7 +89,7 @@ The application uses environment-based configuration:
 
 ### Development Workflow
 1. Copy `.env.example` to `.env` and configure as needed
-2. Use `docker-compose up` to start all services
+2. Use `docker compose up` to start all services
 3. Frontend available at http://localhost:5173
 4. Backend API at http://localhost:8000 (with auto-docs at /docs)
 5. Jupyter at http://localhost:8888
