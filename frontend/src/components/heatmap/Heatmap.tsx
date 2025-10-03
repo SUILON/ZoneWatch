@@ -11,7 +11,6 @@ import {
 } from "@mui/material";
 import { MapContainer, GeoJSON, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import ScrollableContainer from "@/components/common/ScrollableContainer";
 import {
   asahiFireDepartmentData,
   allViewMapSettings,
@@ -54,9 +53,14 @@ const MapController: React.FC<{
   return null;
 };
 
-const PANEL_MIN_WIDTH_PERCENT = 35;
-const PANEL_MAX_WIDTH_PERCENT = 75;
 const CONTROL_MIN_WIDTH_PX = 360;
+const CONTROL_MIN_HEIGHT_PX = 260;
+const MAP_INITIAL_WIDTH_PERCENT = 60;
+const MAP_INITIAL_HEIGHT_PERCENT = 55;
+const MAP_MIN_WIDTH_PX = 200;
+const MAP_MIN_HEIGHT_PX = 200;
+const SEPARATOR_THICKNESS = 8;
+const SEPARATOR_COLLAPSED_THICKNESS = 16;
 
 interface HeatmapProps {
   title?: string;
@@ -72,13 +76,36 @@ const Heatmap: React.FC<HeatmapProps> = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedColorMapping, setSelectedColorMapping] =
     useState<ColorMappingType>("emergencyCalls");
-  const [mapPanelWidth, setMapPanelWidth] = useState<number>(60);
-  const [lastExpandedMapWidth, setLastExpandedMapWidth] =
-    useState<number>(60);
+  const [mapPanelWidth, setMapPanelWidth] = useState<number>(0);
+  const [mapPanelHeight, setMapPanelHeight] = useState<number>(
+    MAP_MIN_HEIGHT_PX + 80
+  );
+  const [controlPanelWidth, setControlPanelWidth] = useState<number>(
+    CONTROL_MIN_WIDTH_PX + 80
+  );
+  const [lastExpandedLayout, setLastExpandedLayout] = useState<{
+    horizontal: { mapWidth: number; controlWidth: number };
+    vertical: { mapHeight: number };
+  }>({
+    horizontal: {
+      mapWidth: 0,
+      controlWidth: CONTROL_MIN_WIDTH_PX,
+    },
+    vertical: {
+      mapHeight: MAP_MIN_HEIGHT_PX + 80,
+    },
+  });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isControlCollapsed, setIsControlCollapsed] = useState<boolean>(false);
+  const [isStackedLayout, setIsStackedLayout] = useState<boolean>(false);
   const [resizeTrigger, setResizeTrigger] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [containerHeight, setContainerHeight] = useState<number>(0);
+  const hasInitializedLayout = useRef<boolean>(false);
+  const preferredControlPanelWidth = useRef<number>(CONTROL_MIN_WIDTH_PX + 80);
+  const preferredMapPanelHeight = useRef<number>(MAP_MIN_HEIGHT_PX + 80);
+  const dragOrientationRef = useRef<"horizontal" | "vertical">("horizontal");
   // カラーステップ数（凡例/塗りつぶしで共通利用）
   const colorSteps = 5;
 
@@ -87,57 +114,114 @@ const Heatmap: React.FC<HeatmapProps> = () => {
   const maxDate = new Date(2030, 11, 31);
   const predictionStartDate = new Date(2024, 11, 31);
 
-  const updateWidthFromClientX = useCallback((clientX: number) => {
-    const container = containerRef.current;
-    if (!container || isControlCollapsed) return;
-    const rect = container.getBoundingClientRect();
-    if (rect.width === 0) return;
+  const updateWidthFromClientX = useCallback(
+    (clientX: number) => {
+      const container = containerRef.current;
+      if (!container || isControlCollapsed || isStackedLayout) return;
+      const rect = container.getBoundingClientRect();
+      if (rect.width === 0) return;
 
-    const relativeX = clientX - rect.left;
-    const rawWidthPercent = (relativeX / rect.width) * 100;
+      const separatorWidth = SEPARATOR_THICKNESS;
+      const relativeX = clientX - rect.left;
 
-    const absoluteMax = 100 - (CONTROL_MIN_WIDTH_PX / rect.width) * 100;
-    const maxAllowed = Math.max(
-      PANEL_MIN_WIDTH_PERCENT,
-      Math.min(PANEL_MAX_WIDTH_PERCENT, absoluteMax)
-    );
+      const maxMapWidth = rect.width - separatorWidth - CONTROL_MIN_WIDTH_PX;
+      const clampedMapWidth = Math.min(
+        Math.max(relativeX, MAP_MIN_WIDTH_PX),
+        maxMapWidth
+      );
+      const nextControlWidth = rect.width - separatorWidth - clampedMapWidth;
 
-    const nextWidth = Math.min(
-      maxAllowed,
-      Math.max(PANEL_MIN_WIDTH_PERCENT, rawWidthPercent)
-    );
+      setMapPanelWidth(clampedMapWidth);
+      setControlPanelWidth(nextControlWidth);
+      preferredControlPanelWidth.current = nextControlWidth;
+      setLastExpandedLayout(prev => ({
+        ...prev,
+        horizontal: {
+          mapWidth: clampedMapWidth,
+          controlWidth: nextControlWidth,
+        },
+      }));
+    },
+    [isControlCollapsed, isStackedLayout]
+  );
 
-    setMapPanelWidth(nextWidth);
-    setLastExpandedMapWidth(nextWidth);
-  }, [isControlCollapsed]);
+  const updateHeightFromClientY = useCallback(
+    (clientY: number) => {
+      const container = containerRef.current;
+      if (!container || isControlCollapsed || !isStackedLayout) return;
+      const rect = container.getBoundingClientRect();
+      if (rect.height === 0) return;
+
+      const separatorThickness = SEPARATOR_THICKNESS;
+      const relativeY = clientY - rect.top;
+
+      const maxMapHeight = Math.max(
+        MAP_MIN_HEIGHT_PX,
+        rect.height - separatorThickness - CONTROL_MIN_HEIGHT_PX
+      );
+      const clampedMapHeight = Math.min(
+        Math.max(relativeY, MAP_MIN_HEIGHT_PX),
+        maxMapHeight
+      );
+
+      setMapPanelHeight(clampedMapHeight);
+      preferredMapPanelHeight.current = clampedMapHeight;
+      setLastExpandedLayout(prev => ({
+        ...prev,
+        vertical: {
+          mapHeight: clampedMapHeight,
+        },
+      }));
+    },
+    [isControlCollapsed, isStackedLayout]
+  );
 
   // コントロールエリアの開閉トグル
   const handleTogglePanel = useCallback(() => {
     if (isControlCollapsed) {
-      let restoredWidth = lastExpandedMapWidth;
-      const container = containerRef.current;
-      if (container) {
-        const rect = container.getBoundingClientRect();
-        if (rect.width > 0) {
-          const absoluteMax = 100 - (CONTROL_MIN_WIDTH_PX / rect.width) * 100;
-          if (absoluteMax > PANEL_MIN_WIDTH_PERCENT) {
-            const maxAllowed = Math.min(PANEL_MAX_WIDTH_PERCENT, absoluteMax);
-            restoredWidth = Math.min(
-              Math.max(PANEL_MIN_WIDTH_PERCENT, restoredWidth),
-              maxAllowed
-            );
-          } else {
-            restoredWidth = PANEL_MIN_WIDTH_PERCENT;
-          }
-        }
-      }
-      setMapPanelWidth(restoredWidth);
       setIsControlCollapsed(false);
+      if (lastExpandedLayout.horizontal.mapWidth > 0) {
+        setMapPanelWidth(lastExpandedLayout.horizontal.mapWidth);
+      }
+      if (lastExpandedLayout.horizontal.controlWidth > 0) {
+        setControlPanelWidth(lastExpandedLayout.horizontal.controlWidth);
+        preferredControlPanelWidth.current =
+          lastExpandedLayout.horizontal.controlWidth;
+      }
+      if (lastExpandedLayout.vertical.mapHeight > 0) {
+        setMapPanelHeight(lastExpandedLayout.vertical.mapHeight);
+        preferredMapPanelHeight.current =
+          lastExpandedLayout.vertical.mapHeight;
+      }
     } else {
-      setLastExpandedMapWidth(mapPanelWidth);
+      setLastExpandedLayout(prev => ({
+        horizontal: {
+          mapWidth: isStackedLayout
+            ? prev.horizontal.mapWidth
+            : mapPanelWidth,
+          controlWidth: isStackedLayout
+            ? prev.horizontal.controlWidth
+            : controlPanelWidth,
+        },
+        vertical: {
+          mapHeight: isStackedLayout ? mapPanelHeight : prev.vertical.mapHeight,
+        },
+      }));
+      if (isStackedLayout) {
+        preferredMapPanelHeight.current = mapPanelHeight;
+      } else {
+        preferredControlPanelWidth.current = controlPanelWidth;
+      }
       setIsControlCollapsed(true);
     }
-  }, [isControlCollapsed, lastExpandedMapWidth, mapPanelWidth]);
+  }, [
+    controlPanelWidth,
+    isControlCollapsed,
+    isStackedLayout,
+    lastExpandedLayout,
+    mapPanelHeight,
+    mapPanelWidth,
+  ]);
 
   const handleDragStart = useCallback(
     (
@@ -146,26 +230,55 @@ const Heatmap: React.FC<HeatmapProps> = () => {
         | React.TouchEvent<HTMLDivElement>
     ) => {
       event.preventDefault();
-      const clientX =
-        "touches" in event ? event.touches[0]?.clientX : event.clientX;
-      if (typeof clientX === "number") {
-        updateWidthFromClientX(clientX);
+      if (isControlCollapsed) return;
+
+      const touchPoint = "touches" in event ? event.touches[0] : undefined;
+
+      if (isStackedLayout) {
+        const clientY = touchPoint
+          ? touchPoint.clientY
+          : (event as React.MouseEvent<HTMLDivElement>).clientY;
+        if (typeof clientY === "number") {
+          dragOrientationRef.current = "vertical";
+          updateHeightFromClientY(clientY);
+          setIsDragging(true);
+        }
+      } else {
+        const clientX = touchPoint
+          ? touchPoint.clientX
+          : (event as React.MouseEvent<HTMLDivElement>).clientX;
+        if (typeof clientX === "number") {
+          dragOrientationRef.current = "horizontal";
+          updateWidthFromClientX(clientX);
+          setIsDragging(true);
+        }
       }
-      setIsDragging(true);
     },
-    [updateWidthFromClientX]
+    [
+      isControlCollapsed,
+      isStackedLayout,
+      updateHeightFromClientY,
+      updateWidthFromClientX,
+    ]
   );
 
   useEffect(() => {
     if (!isDragging) return;
 
     const handleMouseMove = (event: MouseEvent) => {
-      updateWidthFromClientX(event.clientX);
+      if (dragOrientationRef.current === "vertical") {
+        updateHeightFromClientY(event.clientY);
+      } else {
+        updateWidthFromClientX(event.clientX);
+      }
     };
 
     const handleTouchMove = (event: TouchEvent) => {
       const touch = event.touches[0];
-      if (touch) {
+      if (!touch) return;
+      if (dragOrientationRef.current === "vertical") {
+        updateHeightFromClientY(touch.clientY);
+      } else {
         updateWidthFromClientX(touch.clientX);
       }
     };
@@ -185,7 +298,11 @@ const Heatmap: React.FC<HeatmapProps> = () => {
       window.removeEventListener("touchend", stopDragging);
       window.removeEventListener("touchcancel", stopDragging);
     };
-  }, [isDragging, updateWidthFromClientX]);
+  }, [
+    isDragging,
+    updateHeightFromClientY,
+    updateWidthFromClientX,
+  ]);
 
   // マップパネル幅の変更を監視してマップリサイズをトリガー
   useEffect(() => {
@@ -195,7 +312,155 @@ const Heatmap: React.FC<HeatmapProps> = () => {
       }, 250); // ドラッグ完了後少し待ってからリサイズ
       return () => clearTimeout(timeoutId);
     }
-  }, [mapPanelWidth, isControlCollapsed, isDragging]);
+  }, [
+    isControlCollapsed,
+    isDragging,
+    isStackedLayout,
+    mapPanelHeight,
+    mapPanelWidth,
+  ]);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(entries => {
+      if (!entries.length) return;
+      const { width, height } = entries[0].contentRect;
+      setContainerWidth(width);
+      setContainerHeight(height);
+    });
+
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!containerWidth || !containerHeight) return;
+
+    if (isControlCollapsed) {
+      setIsStackedLayout(false);
+      setMapPanelWidth(containerWidth);
+      setMapPanelHeight(containerHeight);
+      return;
+    }
+
+    const separatorThickness = SEPARATOR_THICKNESS;
+    const shouldStack =
+      containerWidth - CONTROL_MIN_WIDTH_PX - separatorThickness <
+      MAP_MIN_WIDTH_PX;
+
+    if (shouldStack !== isStackedLayout) {
+      setIsStackedLayout(shouldStack);
+    }
+
+    if (!hasInitializedLayout.current) {
+      if (shouldStack) {
+        const tentativeMapHeight = Math.max(
+          MAP_MIN_HEIGHT_PX,
+          (containerHeight * MAP_INITIAL_HEIGHT_PERCENT) / 100
+        );
+        const maxMapHeight = Math.max(
+          MAP_MIN_HEIGHT_PX,
+          containerHeight - separatorThickness - CONTROL_MIN_HEIGHT_PX
+        );
+        const clampedMapHeight = Math.min(tentativeMapHeight, maxMapHeight);
+
+        preferredMapPanelHeight.current = clampedMapHeight;
+        setMapPanelHeight(clampedMapHeight);
+        setLastExpandedLayout(prev => ({
+          ...prev,
+          vertical: { mapHeight: clampedMapHeight },
+        }));
+      } else {
+        const tentativeMapWidth = Math.max(
+          MAP_MIN_WIDTH_PX,
+          (containerWidth * MAP_INITIAL_WIDTH_PERCENT) / 100
+        );
+        const initialControlWidth =
+          containerWidth - separatorThickness - tentativeMapWidth;
+        const maxControlWidth = Math.max(
+          containerWidth - MAP_MIN_WIDTH_PX - separatorThickness,
+          CONTROL_MIN_WIDTH_PX
+        );
+        const clampedControlWidth = Math.min(
+          Math.max(initialControlWidth, CONTROL_MIN_WIDTH_PX),
+          maxControlWidth
+        );
+        const resultingMapWidth =
+          containerWidth - separatorThickness - clampedControlWidth;
+
+        preferredControlPanelWidth.current = clampedControlWidth;
+        setControlPanelWidth(clampedControlWidth);
+        setMapPanelWidth(Math.max(resultingMapWidth, MAP_MIN_WIDTH_PX));
+        setLastExpandedLayout(prev => ({
+          ...prev,
+          horizontal: {
+            mapWidth: Math.max(resultingMapWidth, MAP_MIN_WIDTH_PX),
+            controlWidth: clampedControlWidth,
+          },
+        }));
+      }
+
+      hasInitializedLayout.current = true;
+      return;
+    }
+
+    if (shouldStack) {
+      const maxMapHeight = Math.max(
+        MAP_MIN_HEIGHT_PX,
+        containerHeight - separatorThickness - CONTROL_MIN_HEIGHT_PX
+      );
+      const desiredMapHeight = Math.min(
+        Math.max(preferredMapPanelHeight.current, MAP_MIN_HEIGHT_PX),
+        maxMapHeight
+      );
+
+      if (Math.abs(desiredMapHeight - mapPanelHeight) > 1) {
+        setMapPanelHeight(desiredMapHeight);
+      }
+      preferredMapPanelHeight.current = desiredMapHeight;
+      setLastExpandedLayout(prev => ({
+        ...prev,
+        vertical: { mapHeight: desiredMapHeight },
+      }));
+    } else {
+      const maxControlWidth = Math.max(
+        containerWidth - MAP_MIN_WIDTH_PX - separatorThickness,
+        CONTROL_MIN_WIDTH_PX
+      );
+      const desiredControlWidth = Math.min(
+        Math.max(preferredControlPanelWidth.current, CONTROL_MIN_WIDTH_PX),
+        maxControlWidth
+      );
+      const availableMapWidth =
+        containerWidth - separatorThickness - desiredControlWidth;
+
+      if (Math.abs(availableMapWidth - mapPanelWidth) > 1) {
+        setMapPanelWidth(availableMapWidth);
+      }
+      if (Math.abs(desiredControlWidth - controlPanelWidth) > 1) {
+        setControlPanelWidth(desiredControlWidth);
+      }
+      preferredControlPanelWidth.current = desiredControlWidth;
+      setLastExpandedLayout(prev => ({
+        ...prev,
+        horizontal: {
+          mapWidth: availableMapWidth,
+          controlWidth: desiredControlWidth,
+        },
+      }));
+    }
+  }, [
+    containerHeight,
+    containerWidth,
+    controlPanelWidth,
+    isControlCollapsed,
+    isStackedLayout,
+    mapPanelHeight,
+    mapPanelWidth,
+  ]);
 
   // 日付スライダーの値変更ハンドラー
   const handleDateChange = (_event: Event, newValue: number | number[]) => {
@@ -403,10 +668,11 @@ const Heatmap: React.FC<HeatmapProps> = () => {
   };
 
   return (
-    <ScrollableContainer
-      additionalSx={{
+    <Box
+      sx={{
         p: 2,
         height: "100%",
+        boxSizing: "border-box",
         userSelect: isDragging ? "none" : "auto",
         touchAction: isDragging ? "none" : "auto",
       }}
@@ -415,130 +681,170 @@ const Heatmap: React.FC<HeatmapProps> = () => {
         ref={containerRef}
         sx={{
           display: "flex",
+          flexDirection: isStackedLayout ? "column" : "row",
           height: "100%",
           alignItems: "stretch",
           gap: 0,
+          overflow: "hidden",
         }}
       >
         <Box
           sx={{
-            flexBasis: isControlCollapsed ? "auto" : `${mapPanelWidth}%`,
+            flexBasis: isControlCollapsed
+              ? "auto"
+              : isStackedLayout
+              ? `${Math.max(mapPanelHeight, MAP_MIN_HEIGHT_PX)}px`
+              : `${Math.max(mapPanelWidth, MAP_MIN_WIDTH_PX)}px`,
             flexGrow: isControlCollapsed ? 1 : 0,
             flexShrink: isControlCollapsed ? 1 : 0,
-            minWidth: "320px",
-            minHeight: "500px",
+            width: isStackedLayout || isControlCollapsed ? "100%" : "auto",
+            minWidth: isStackedLayout ? "100%" : `${MAP_MIN_WIDTH_PX}px`,
+            minHeight: `${MAP_MIN_HEIGHT_PX}px`,
+            height:
+              isStackedLayout && !isControlCollapsed
+                ? `${Math.max(mapPanelHeight, MAP_MIN_HEIGHT_PX)}px`
+                : "auto",
             border: "1px solid #ccc",
             borderRadius: 1,
             position: "relative",
             overflow: "hidden",
-            transition: isDragging ? "none" : "flex-basis 0.2s ease",
+            transition:
+              isDragging || isStackedLayout ? "none" : "flex-basis 0.2s ease",
           }}
-        >
-          <IconButton
-            onClick={handleResetMapPosition}
-            sx={{
-              position: "absolute",
-              top: 10,
-              right: 10,
-              zIndex: 1000,
-              backgroundColor: "background.paper",
-              boxShadow: 1,
-              "&:hover": {
-                backgroundColor: "background.paper",
-                boxShadow: 2,
-              },
-            }}
-            aria-label="位置を戻す"
-            title="位置を戻す"
-          >
-            <CenterFocusStrongIcon />
-          </IconButton>
-
-          <LegendComponent
-            asahiFireDepartmentData={asahiFireDepartmentData}
-            selectedColorMapping={selectedColorMapping}
-            selectedDate={selectedDate}
-            colorSteps={colorSteps}
-          />
-
-          <MapContainer
-            center={allViewMapSettings.center}
-            zoom={allViewMapSettings.zoom}
-            style={{ height: "100%", width: "100%" }}
-          >
-            <MapController center={mapCenter} zoom={mapZoom} triggerResize={resizeTrigger} />
-            {geoJsonData && (
-              <GeoJSON
-                key={`${selectedDepartment}-${selectedColorMapping}-${selectedDate.getTime()}-${mapPanelWidth}`}
-                data={geoJsonData}
-                style={getFeatureStyle}
-                onEachFeature={onEachFeature}
-              />
-            )}
-          </MapContainer>
-        </Box>
-
-        <Box
-          role="separator"
-          aria-orientation="vertical"
-          aria-expanded={!isControlCollapsed}
-          tabIndex={0}
-          onMouseDown={!isControlCollapsed ? handleDragStart : undefined}
-          onTouchStart={!isControlCollapsed ? handleDragStart : undefined}
-          onClick={(event) => {
-            // コントロールパネルが閉じている場合はクリックで展開
-            if (isControlCollapsed) {
-              event.preventDefault();
-              handleTogglePanel();
-            }
-          }}
-          onDoubleClick={handleTogglePanel}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              handleTogglePanel();
-            }
-          }}
+      >
+        <IconButton
+          onClick={handleResetMapPosition}
           sx={{
-            width: isControlCollapsed ? "16px" : "8px",
-            cursor: isControlCollapsed ? "pointer" : "col-resize",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            px: "2px",
-            outline: "none",
-            "&:focus-visible": {
-              boxShadow: (theme) => `0 0 0 2px ${theme.palette.primary.main}`,
-              borderRadius: "4px",
+            position: "absolute",
+            top: 10,
+            right: 10,
+            zIndex: 1000,
+            backgroundColor: "background.paper",
+            boxShadow: 1,
+            "&:hover": {
+              backgroundColor: "background.paper",
+              boxShadow: 2,
             },
           }}
-          title={
-            isControlCollapsed ? "クリックでコントロールを再表示" : "幅を調整 (ダブルクリックで折りたたみ)"
-          }
+          aria-label="位置を戻す"
+          title="位置を戻す"
         >
-          <Box
-            sx={{
-              width: "3px",
-              height: "90px",
-              borderRadius: "1px",
-              backgroundColor: isDragging
-                ? "primary.main"
-                : isControlCollapsed
-                ? "primary.main"
-                : "divider",
-            }}
+          <CenterFocusStrongIcon />
+        </IconButton>
+
+        <LegendComponent
+          asahiFireDepartmentData={asahiFireDepartmentData}
+          selectedColorMapping={selectedColorMapping}
+          selectedDate={selectedDate}
+          colorSteps={colorSteps}
+        />
+
+        <MapContainer
+          center={allViewMapSettings.center}
+          zoom={allViewMapSettings.zoom}
+          style={{ height: "100%", width: "100%" }}
+        >
+          <MapController
+            center={mapCenter}
+            zoom={mapZoom}
+            triggerResize={resizeTrigger}
           />
-        </Box>
+          {geoJsonData && (
+            <GeoJSON
+              key={`${selectedDepartment}-${selectedColorMapping}-${selectedDate.getTime()}-${
+                isStackedLayout
+                  ? Math.round(mapPanelHeight)
+                  : Math.round(mapPanelWidth)
+              }`}
+              data={geoJsonData}
+              style={getFeatureStyle}
+              onEachFeature={onEachFeature}
+            />
+          )}
+        </MapContainer>
+      </Box>
+
+      <Box
+        role="separator"
+        aria-orientation={isStackedLayout ? "horizontal" : "vertical"}
+        aria-expanded={!isControlCollapsed}
+        tabIndex={0}
+        onMouseDown={!isControlCollapsed ? handleDragStart : undefined}
+        onTouchStart={!isControlCollapsed ? handleDragStart : undefined}
+        onClick={(event) => {
+          // コントロールパネルが閉じている場合はクリックで展開
+          if (isControlCollapsed) {
+            event.preventDefault();
+            handleTogglePanel();
+          }
+        }}
+        onDoubleClick={handleTogglePanel}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            handleTogglePanel();
+          }
+        }}
+        sx={{
+          width: isStackedLayout
+            ? "100%"
+            : isControlCollapsed
+            ? `${SEPARATOR_COLLAPSED_THICKNESS}px`
+            : `${SEPARATOR_THICKNESS}px`,
+          height: isStackedLayout
+            ? isControlCollapsed
+              ? `${SEPARATOR_COLLAPSED_THICKNESS}px`
+              : `${SEPARATOR_THICKNESS}px`
+            : "auto",
+          cursor:
+            isControlCollapsed
+              ? "pointer"
+              : isStackedLayout
+              ? "row-resize"
+              : "col-resize",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          px: isStackedLayout ? 0 : "2px",
+          py: isStackedLayout ? "2px" : 0,
+          outline: "none",
+          my: isStackedLayout ? 1 : 0,
+          "&:focus-visible": {
+            boxShadow: (theme) => `0 0 0 2px ${theme.palette.primary.main}`,
+            borderRadius: "4px",
+          },
+        }}
+        title={
+          isControlCollapsed ? "クリックでコントロールを再表示" : "幅を調整 (ダブルクリックで折りたたみ)"
+        }
+      >
+        <Box
+          sx={{
+            width: isStackedLayout ? "90px" : "3px",
+            height: isStackedLayout ? "3px" : "90px",
+            borderRadius: "1px",
+            backgroundColor: isDragging
+              ? "primary.main"
+              : isControlCollapsed
+              ? "primary.main"
+              : "divider",
+          }}
+        />
+      </Box>
 
         {!isControlCollapsed && (
           <Paper
             sx={{
               flexGrow: 1,
-              minWidth: `${CONTROL_MIN_WIDTH_PX}px`,
+              minWidth: isStackedLayout ? "auto" : `${CONTROL_MIN_WIDTH_PX}px`,
+              width: isStackedLayout ? "100%" : "auto",
+              mt: isStackedLayout ? 2 : 0,
+              minHeight: isStackedLayout ? `${CONTROL_MIN_HEIGHT_PX}px` : "auto",
               boxShadow: 1,
               display: "flex",
               flexDirection: "column",
+              overflow: "hidden",
             }}
           >
             <Box
@@ -548,10 +854,18 @@ const Heatmap: React.FC<HeatmapProps> = () => {
                 justifyContent: "space-between",
                 p: 2,
                 pb: 1,
+                flexShrink: 0,
               }}
             ></Box>
 
-            <Box sx={{ p: 2, pt: 1 }}>
+            <Box
+              sx={{
+                p: 2,
+                pt: 1,
+                flexGrow: 1,
+                overflowY: "auto",
+              }}
+            >
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                   <FormControl sx={{ width: "100%" }}>
@@ -605,7 +919,8 @@ const Heatmap: React.FC<HeatmapProps> = () => {
           </Paper>
         )}
       </Box>
-    </ScrollableContainer>
+    </Box>
+
   );
 };
 
