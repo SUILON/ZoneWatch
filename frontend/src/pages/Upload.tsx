@@ -275,7 +275,7 @@ const Upload: React.FC = () => {
               ファイルアップロード
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              ヒートマップやダッシュボードで利用するデータファイルをアップロードします。
+              ヒートマップや予測で利用するデータファイルをアップロードします。
               {` 対応形式: ${ACCEPTED_EXTENSIONS.join(", ")}`}
             </Typography>
           </Box>
@@ -359,13 +359,6 @@ const Upload: React.FC = () => {
                 accept={acceptAttribute}
                 onChange={handleFileInputChange}
               />
-
-              <Stack direction="row" spacing={1} justifyContent="center">
-                <Typography variant="caption" color="text.secondary">
-                  アップロードできるファイルはxlsx形式のみです。
-                
-                </Typography>
-              </Stack>
             </Stack>
           </Box>
 
