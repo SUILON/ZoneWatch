@@ -13,6 +13,7 @@ import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import { CloudUpload } from "@mui/icons-material";
 
 export const drawerWidth = 300;
 export const miniDrawerWidth = 72;
@@ -196,6 +197,24 @@ export default function Sidebar() {
             {!isMinimized && (
               <ListItemText
                 primary="ホーム"
+                sx={getListItemTextStyle(isMinimized)}
+              />
+            )}
+          </Link>
+        </ListItem>
+        <ListItem key="Upload" sx={getListItemStyle(isMinimized)}>
+          <Link
+            to="/upload"
+            style={getItemStyle("/upload")}
+            onClick={(e) => handleNavigation(e, "/upload")}
+            title={isMinimized ? "アップロード" : ""}
+          >
+            <ListItemIcon sx={getListItemIconStyle(isMinimized)}>
+              <CloudUpload />
+            </ListItemIcon>
+            {!isMinimized && (
+              <ListItemText
+                primary="アップロード"
                 sx={getListItemTextStyle(isMinimized)}
               />
             )}

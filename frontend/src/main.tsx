@@ -6,6 +6,7 @@ import Config from "@/config";
 import Home from "@/pages/Home.tsx";
 import Admin from "@/pages/Admin.tsx";
 import Setting from "@/pages/Setting.tsx";
+import Upload from "./pages/Upload";
 
 // 設定情報をログ出力（開発環境のみ）
 Config.logConfig();
@@ -18,6 +19,7 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/upload" element={<Upload />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/setting" element={<Setting />} />
       </Routes>
